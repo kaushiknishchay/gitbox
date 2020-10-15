@@ -1,7 +1,19 @@
 package main
 
-import "fmt"
+import (
+	"github.com/gin-gonic/gin"
+	"log"
+	"net/http"
+)
 
 func main() {
-	fmt.Println("Hello world")
+	r := gin.Default()
+
+	r.GET("/", func(c *gin.Context) {
+		c.String(http.StatusOK, "Hello golang gin!")
+	})
+
+	if err := r.Run(); err != nil {
+		log.Fatalf("Unable to start server %v", err)
+	}
 }
