@@ -1,0 +1,16 @@
+### Create Repo
+POST http://localhost:9090/repo
+Content-Type: application/json
+
+{
+  "name": "test-repo"
+}
+
+### Check if repo exists
+GET http://localhost:9090/git/test-repo
+
+### Check if git routes are working (use git push/pull instead)
+GET http://localhost:9090/git/test-repo/info/refs?service=git-upload-pack
+
+### Get repo logs
+GET http://localhost:9090/git/test-repo/log
