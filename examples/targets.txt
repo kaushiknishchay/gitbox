@@ -1,0 +1,3 @@
+GET http://localhost:9090/git/test-repo/log
+Content-Type: application/json
+User-Agent: Vegeta

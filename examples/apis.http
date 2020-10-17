@@ -3,7 +3,7 @@ POST http://localhost:9090/repo
 Content-Type: application/json
 
 {
-  "name": "test-repo"
+  "name": {{$uuid}}
 }
 
 ### Check if repo exists
