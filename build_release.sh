@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-rm -rf ./release
+mkdir -p ./release
 
 package_name='git-on-web'
 
