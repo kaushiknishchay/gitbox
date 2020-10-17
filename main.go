@@ -16,6 +16,11 @@ type RepoCreateRequest struct {
 	RepoName string `json:"name" binding:"required"`
 }
 
+type RepoCreateResponse struct {
+	Status   bool   `json:"status"`
+	RepoName string `json:"repoName"`
+}
+
 func addGitRoutes(gitOps *gin.RouterGroup) {
 	gitOps.Use(func(c *gin.Context) {
 		repoName := c.Params.ByName("repo")
@@ -75,7 +80,8 @@ func addGitRoutes(gitOps *gin.RouterGroup) {
 	})
 }
 
-func main() {
+func setupServer() *gin.Engine {
+
 	router := gin.Default()
 
 	router.GET("/", func(c *gin.Context) {
@@ -116,7 +122,16 @@ func main() {
 	gitOps := router.Group("/git/:repo")
 	addGitRoutes(gitOps)
 
-	if err := router.Run(fmt.Sprintf(":%s", config.PORT)); err != nil {
+	return router
+}
+
+func main() {
+	ginRouter := setupServer()
+
+	if err := ginRouter.Run(fmt.Sprintf(":%s", config.PORT)); err != nil {
 		log.Fatalf("Unable to start server %v", err)
 	}
+	//if err := router.RunTLS(fmt.Sprintf(":%s", config.PORT), "./certs/server.pem", "./certs/server.key"); err != nil {
+	//	log.Fatalf("Unable to start server %v", err)
+	//}
 }
