@@ -39,8 +39,7 @@ jobs:
       - name: Release Changelog
         id: changelog
         run: |
-          echo "::set-output name=body::$(git log --pretty=format:%s `git tag --sort=-committerdate | head -1`...`git tag --sort=-committerdate | head -2 | awk '{split($0, tags, "\n")} END {print tags[1]}'`)"
-          git log --pretty=format:%s `git tag --sort=-committerdate | head -1`...`git tag --sort=-committerdate | head -2 | awk '{split($0, tags, "\n")} END {print tags[1]}'`
+          git log --pretty=format:%s `git tag --sort=-committerdate | head -1`...`git tag --sort=-committerdate | head -2 | awk '{split($0, tags, "\n")} END {print tags[1]}'` > changelog.md
 
       - name: Create Release
         id: create_release
@@ -51,7 +50,7 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
           draft: false
-          body: ${{ steps.changelog.outputs.body }}
+          body_path: ./changelog.md
           prerelease: false
 
       - name: Upload Mac Release Asset
