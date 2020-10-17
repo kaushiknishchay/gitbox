@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"git-on-web/config"
 	"git-on-web/server"
@@ -126,12 +127,13 @@ func setupServer() *gin.Engine {
 }
 
 func main() {
+	flag.StringVar(&config.PORT, "port", "9090", "port on which to run the server. Default: 9090")
+	flag.StringVar(&config.REPO_BASE_DIR, "repos", "/tmp/repos", "directory where repos will be created. Default: /tmp/repos")
+	flag.Parse()
+
 	ginRouter := setupServer()
 
 	if err := ginRouter.Run(fmt.Sprintf(":%s", config.PORT)); err != nil {
 		log.Fatalf("Unable to start server %v", err)
 	}
-	//if err := router.RunTLS(fmt.Sprintf(":%s", config.PORT), "./certs/server.pem", "./certs/server.key"); err != nil {
-	//	log.Fatalf("Unable to start server %v", err)
-	//}
 }
