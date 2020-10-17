@@ -24,6 +24,13 @@ func CheckRepoExists(repoName string) error {
 	return errors.New("repo with name already exists")
 }
 
+func RemoveRepoAtPath(repoAbsolutePath string) error {
+	if err := os.RemoveAll(repoAbsolutePath); err != nil {
+		return err
+	}
+	return nil
+}
+
 func CreateNewRepo(repoName string) error {
 	repoAbsolutePath := GetRepoAbsolutePath(repoName)
 
@@ -37,7 +44,7 @@ func CreateNewRepo(repoName string) error {
 
 	if err := initCommand.Run(); err != nil {
 		// remove directory if git init fails
-		if err := os.RemoveAll(repoAbsolutePath); err != nil {
+		if err := RemoveRepoAtPath(repoAbsolutePath); err != nil {
 			return err
 		}
 		return err
