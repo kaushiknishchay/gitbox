@@ -1,16 +1,15 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"git-on-web/config"
 	"git-on-web/server"
 	"git-on-web/utils"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
-	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 type RepoCreateRequest struct {
@@ -25,6 +24,16 @@ type RepoCreateResponse struct {
 func addGitRoutes(gitOps *gin.RouterGroup) {
 	gitOps.Use(func(c *gin.Context) {
 		repoName := c.Params.ByName("repo")
+
+		if repoNameValid := utils.IsRepoNameValid(repoName); !repoNameValid {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status": false,
+				"error":  "invalid repo name",
+			})
+			c.Abort()
+			return
+		}
+
 		exists := utils.CheckRepoExists(repoName)
 
 		if exists == nil {
@@ -50,22 +59,12 @@ func addGitRoutes(gitOps *gin.RouterGroup) {
 		case "/log":
 			repoName := c.Params.ByName("repo")
 
-			logsObject, err := utils.GetCommitsLog(repoName)
-			logsArrayString := fmt.Sprintf("[%s]", strings.TrimSuffix(logsObject, ","))
-
-			var logsJSON []interface{}
-
-			if err := json.Unmarshal([]byte(logsArrayString), &logsJSON); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"status": false,
-					"error":  "unable to output logs",
-				})
-				return
-			}
+			logsJSON, err := utils.GetCommitsLog(repoName)
 
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"status": false,
+					"error":  err.Error(),
 				})
 				return
 			}
@@ -96,6 +95,13 @@ func setupServer() *gin.Engine {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   err.Error(),
 				"message": "Only JSON requests are allowed",
+			})
+			return
+		}
+
+		if repoNameValid := utils.IsRepoNameValid(request.RepoName); !repoNameValid {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "repo name can only contain alpha numeric characters and '-' or '_'",
 			})
 			return
 		}

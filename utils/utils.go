@@ -1,14 +1,43 @@
 package utils
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"git-on-web/config"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
+	"strings"
 )
+
+type Author struct {
+	Date  string `json:"date"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+type CommiterType struct {
+	Date  string `json:"date"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+type CommitItem struct {
+	Author   Author       `json:"author"`
+	Body     string       `json:"body"`
+	Commit   string       `json:"commit"`
+	Commiter CommiterType `json:"commiter"`
+	Subject  string       `json:"subject"`
+}
+
+func IsRepoNameValid(repoName string) bool {
+	isAlphaNumeric := regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
+	return isAlphaNumeric(repoName)
+}
 
 func GetRepoAbsolutePath(repoName string) string {
 	return path.Join(config.REPO_BASE_DIR, repoName)
@@ -52,7 +81,9 @@ func CreateNewRepo(repoName string) error {
 
 	return nil
 }
-func GetCommitsLog(repoName string) (string, error) {
+
+// GetCommitsLog to fetch commits log as json array
+func GetCommitsLog(repoName string) ([]CommitItem, error) {
 	repoAbsolutePath := GetRepoAbsolutePath(repoName)
 
 	logCommand := exec.Command("git", "log", `--pretty=format:{ "commit": "%H", "subject": "%s", "body": "%b", "author": { "name": "%aN", "email": "%aE", "date": "%aD" }, "commiter": { "name": "%cN", "email": "%cE", "date": "%cD" }%n},`)
@@ -60,24 +91,34 @@ func GetCommitsLog(repoName string) (string, error) {
 	logCommand.Dir = repoAbsolutePath
 	logStdoutBuffer, err := logCommand.StdoutPipe()
 
+	var logsJSON []CommitItem
+
 	if err != nil {
 		log.Print(err)
-		return "", err
+		return logsJSON, err
 	}
 
 	if err := logCommand.Start(); err != nil {
 		log.Print(err)
-		return "", err
+		return logsJSON, err
 	}
 
-	buf := new(bytes.Buffer)
-	_, _ = buf.ReadFrom(logStdoutBuffer)
-	logsOutput := buf.String()
+	buf := new(strings.Builder)
+	_, err = io.Copy(buf, logStdoutBuffer)
+	logsOutput := fmt.Sprintf("[%s]", strings.TrimSuffix(buf.String(), ","))
+
+	if logsOutput == "[]" {
+		return logsJSON, nil
+	}
 
 	if err := logCommand.Wait(); err != nil {
 		log.Print(err)
-		return "", err
+		return logsJSON, err
 	}
 
-	return logsOutput, nil
+	if err := json.Unmarshal([]byte(logsOutput), &logsJSON); err != nil {
+		return logsJSON, err
+	}
+
+	return logsJSON, nil
 }
