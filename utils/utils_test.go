@@ -26,7 +26,7 @@ func BenchmarkGetCommitsLogOnTestRepo(b *testing.B) {
 	config.REPO_BASE_DIR = a
 
 	for n := 0; n < b.N; n++ {
-		_, _ = GetCommitsLog("test-repo")
+		_, _ = GetCommitsLog("test-repo", 0)
 	}
 }
 
@@ -35,7 +35,16 @@ func BenchmarkGetCommitsLogDiffRepo(b *testing.B) {
 	config.REPO_BASE_DIR = a
 
 	for n := 0; n < b.N; n++ {
-		_, _ = GetCommitsLog("3235a227-e4c2-4caa-a636-9c8f3bdd8189")
+		_, _ = GetCommitsLog("3235a227-e4c2-4caa-a636-9c8f3bdd8189", 0)
+	}
+}
+
+func BenchmarkGetCommitsLogTheiaRepo(b *testing.B) {
+	a := "/tmp/repos"
+	config.REPO_BASE_DIR = a
+
+	for n := 0; n < b.N; n++ {
+		_, _ = GetCommitsLog("theia", rand.Int63n(30))
 	}
 }
 
@@ -62,7 +71,7 @@ func TestGetCommitsLog(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetCommitsLog(tt.args.repoName)
+			got, err := GetCommitsLog(tt.args.repoName, 0)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetCommitsLog() error = %v, wantErr %v", err, tt.wantErr)
 				return
