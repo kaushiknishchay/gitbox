@@ -34,11 +34,14 @@ type CommitItem struct {
 	Subject  string       `json:"subject"`
 }
 
+var repoCheckRegEx = regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
+
+//IsRepoNameValid Checks if repo name is valid and contains only alphanumeric chars
 func IsRepoNameValid(repoName string) bool {
-	isAlphaNumeric := regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
-	return isAlphaNumeric(repoName)
+	return repoCheckRegEx(repoName)
 }
 
+//GetRepoAbsolutePath Get absolute repo path in repo base dir
 func GetRepoAbsolutePath(repoName string) string {
 	return path.Join(config.REPO_BASE_DIR, repoName)
 }
