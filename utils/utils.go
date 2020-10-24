@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"git-on-web/config"
-	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -35,6 +33,10 @@ type CommitItem struct {
 }
 
 var repoCheckRegEx = regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
+
+const perPageCount int64 = 100
+const commitSeparator string = "^^$$^^$$"
+const gitLogFormat string = `--pretty=format:{"commit": "%H","subject": "%s","body": "%b","author": {"name": "%aN", "email": "%aE", "date": "%ad"},"commiter": {"name": "%cN", "email": "%cE", "date": "%cd"}}` + commitSeparator
 
 //IsRepoNameValid Checks if repo name is valid and contains only alphanumeric chars
 func IsRepoNameValid(repoName string) bool {
@@ -86,42 +88,30 @@ func CreateNewRepo(repoName string) error {
 }
 
 // GetCommitsLog to fetch commits log as json array
-func GetCommitsLog(repoName string) ([]CommitItem, error) {
-	repoAbsolutePath := GetRepoAbsolutePath(repoName)
+func GetCommitsLog(repoName string, pageNum int64) ([]CommitItem, error) {
+	logCommand := exec.Command("git", "log", "--date=iso-strict", gitLogFormat, fmt.Sprintf("-n %d", perPageCount), fmt.Sprintf("--skip=%d", pageNum*perPageCount))
 
-	logCommand := exec.Command("git", "log", `--pretty=format:{ "commit": "%H", "subject": "%s", "body": "%b", "author": { "name": "%aN", "email": "%aE", "date": "%aD" }, "commiter": { "name": "%cN", "email": "%cE", "date": "%cD" }%n},`)
+	logCommand.Dir = GetRepoAbsolutePath(repoName)
+	out, _ := logCommand.Output()
 
-	logCommand.Dir = repoAbsolutePath
-	logStdoutBuffer, err := logCommand.StdoutPipe()
+	logOut := strings.Split(string(out), "^^$$^^$$")
 
-	var logsJSON []CommitItem
+	var gitCommitList []CommitItem
+	var commitItem CommitItem
+	for _, singleLog := range logOut {
 
-	if err != nil {
-		log.Print(err)
-		return logsJSON, err
+		if singleLog == "" {
+			continue
+		}
+
+		singleLog = strings.Replace(strings.TrimSpace(singleLog), "\n", `\n`, -1)
+
+		err := json.Unmarshal([]byte(singleLog), &commitItem)
+		if err != nil {
+			continue
+		}
+		gitCommitList = append(gitCommitList, commitItem)
 	}
 
-	if err := logCommand.Start(); err != nil {
-		log.Print(err)
-		return logsJSON, err
-	}
-
-	buf := new(strings.Builder)
-	_, err = io.Copy(buf, logStdoutBuffer)
-	logsOutput := fmt.Sprintf("[%s]", strings.TrimSuffix(buf.String(), ","))
-
-	if logsOutput == "[]" {
-		return logsJSON, nil
-	}
-
-	if err := logCommand.Wait(); err != nil {
-		log.Print(err)
-		return logsJSON, err
-	}
-
-	if err := json.Unmarshal([]byte(logsOutput), &logsJSON); err != nil {
-		return logsJSON, err
-	}
-
-	return logsJSON, nil
+	return gitCommitList, nil
 }

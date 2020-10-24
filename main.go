@@ -8,6 +8,7 @@ import (
 	"git-on-web/utils"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,8 +59,13 @@ func addGitRoutes(gitOps *gin.RouterGroup) {
 			})
 		case "/log":
 			repoName := c.Params.ByName("repo")
+			pageNum, err := strconv.ParseInt(c.DefaultQuery("page", "0"), 10, 32)
 
-			logsJSON, err := utils.GetCommitsLog(repoName)
+			if err != nil || pageNum < 0 {
+				pageNum = 0
+			}
+
+			logsJSON, err := utils.GetCommitsLog(repoName, pageNum)
 
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
