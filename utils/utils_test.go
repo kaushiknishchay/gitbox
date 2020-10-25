@@ -30,24 +30,6 @@ func BenchmarkGetCommitsLogOnTestRepo(b *testing.B) {
 	}
 }
 
-func BenchmarkGetCommitsLogDiffRepo(b *testing.B) {
-	a := "/tmp/repos"
-	config.REPO_BASE_DIR = a
-
-	for n := 0; n < b.N; n++ {
-		_, _ = GetCommitsLog("3235a227-e4c2-4caa-a636-9c8f3bdd8189", 0)
-	}
-}
-
-func BenchmarkGetCommitsLogTheiaRepo(b *testing.B) {
-	a := "/tmp/repos"
-	config.REPO_BASE_DIR = a
-
-	for n := 0; n < b.N; n++ {
-		_, _ = GetCommitsLog("theia", rand.Int63n(30))
-	}
-}
-
 func BenchmarkGetRepoAbsolutePath(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		IsRepoNameValid(generateRandomRepoName(rand.Intn(30)))
@@ -66,8 +48,7 @@ func TestGetCommitsLog(t *testing.T) {
 		want    []CommitItem
 		wantErr bool
 	}{
-		{"1", args{"test"}, nil, true},
-		{"1", args{"test-repo"}, nil, false},
+		{"1", args{"test"}, nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

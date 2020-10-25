@@ -12,18 +12,21 @@ import (
 	"strings"
 )
 
+//Author data present in single commit's Author field
 type Author struct {
 	Date  string `json:"date"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
+//CommiterType data present in single commit's commiter field
 type CommiterType struct {
 	Date  string `json:"date"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
+//CommitItem data present in single commit
 type CommitItem struct {
 	Author   Author       `json:"author"`
 	Body     string       `json:"body"`
@@ -32,11 +35,10 @@ type CommitItem struct {
 	Subject  string       `json:"subject"`
 }
 
-var repoCheckRegEx = regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
+//CommitLogs all commits
+type CommitLogs []CommitItem
 
-const perPageCount int64 = 100
-const commitSeparator string = "^^$$^^$$"
-const gitLogFormat string = `--pretty=format:{"commit": "%H","subject": "%s","body": "%b","author": {"name": "%aN", "email": "%aE", "date": "%ad"},"commiter": {"name": "%cN", "email": "%cE", "date": "%cd"}}` + commitSeparator
+var repoCheckRegEx = regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
 
 //IsRepoNameValid Checks if repo name is valid and contains only alphanumeric chars
 func IsRepoNameValid(repoName string) bool {
@@ -48,6 +50,7 @@ func GetRepoAbsolutePath(repoName string) string {
 	return path.Join(config.REPO_BASE_DIR, repoName)
 }
 
+//CheckRepoExists Check is repo with name already present
 func CheckRepoExists(repoName string) error {
 	repoAbsolutePath := path.Join(config.REPO_BASE_DIR, repoName)
 
@@ -58,6 +61,7 @@ func CheckRepoExists(repoName string) error {
 	return errors.New("repo with name already exists")
 }
 
+//RemoveRepoAtPath remove directory at the path given
 func RemoveRepoAtPath(repoAbsolutePath string) error {
 	if err := os.RemoveAll(repoAbsolutePath); err != nil {
 		return err
@@ -65,6 +69,7 @@ func RemoveRepoAtPath(repoAbsolutePath string) error {
 	return nil
 }
 
+//CreateNewRepo initialize a bare git repo with given name
 func CreateNewRepo(repoName string) error {
 	repoAbsolutePath := GetRepoAbsolutePath(repoName)
 
@@ -89,7 +94,14 @@ func CreateNewRepo(repoName string) error {
 
 // GetCommitsLog to fetch commits log as json array
 func GetCommitsLog(repoName string, pageNum int64) ([]CommitItem, error) {
-	logCommand := exec.Command("git", "log", "--date=iso-strict", gitLogFormat, fmt.Sprintf("-n %d", perPageCount), fmt.Sprintf("--skip=%d", pageNum*perPageCount))
+	logCommand := exec.Command(
+		"git",
+		"log",
+		"--date=iso-strict",
+		config.GitLogFormat,
+		fmt.Sprintf("-n %d", config.PerPageCommitCount),
+		fmt.Sprintf("--skip=%d", pageNum*config.PerPageCommitCount),
+	)
 
 	logCommand.Dir = GetRepoAbsolutePath(repoName)
 	out, _ := logCommand.Output()
