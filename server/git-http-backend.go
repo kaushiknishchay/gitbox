@@ -32,12 +32,14 @@ All credits goes to the original author
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"git-on-web/config"
+	"git-on-web/hub"
 	"git-on-web/utils"
-	"github.com/gin-gonic/gin"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -47,6 +49,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Service struct {
@@ -67,11 +71,12 @@ type Config struct {
 }
 
 type HandlerReq struct {
-	w    http.ResponseWriter
-	r    *http.Request
-	Rpc  string
-	Dir  string
-	File string
+	w        http.ResponseWriter
+	r        *http.Request
+	Rpc      string
+	Dir      string
+	File     string
+	RepoName string
 }
 
 var (
@@ -101,8 +106,10 @@ var services = map[string]Service{
 	"(.*?)/objects/pack/pack-[0-9a-f]{40}\\.idx$":  Service{"GET", getIdxFile, ""},
 }
 
-// Request handling function
+var createSep = []byte{48, 48, 48, 48, 80, 65, 67, 75, 0, 0, 0, 2, 0, 0, 0}
+var deleteSep = []byte{48, 48, 48, 48}
 
+//GitOpsHandler handles git operations
 func GitOpsHandler(c *gin.Context) {
 	var w = c.Writer
 	var r = c.Request
@@ -126,7 +133,7 @@ func GitOpsHandler(c *gin.Context) {
 			file := strings.Replace(r.URL.Path, m[1]+"/", "", 1)
 			repoAbsolutePath := utils.GetRepoAbsolutePath(repoName)
 
-			hr := HandlerReq{w, r, rpc, repoAbsolutePath, file}
+			hr := HandlerReq{w, r, rpc, repoAbsolutePath, file, repoName}
 			service.Handler(hr)
 			return
 		}
@@ -136,7 +143,7 @@ func GitOpsHandler(c *gin.Context) {
 }
 
 func serviceRpc(hr HandlerReq) {
-	w, r, rpc, dir := hr.w, hr.r, hr.Rpc, hr.Dir
+	w, r, rpc, dir, repoName := hr.w, hr.r, hr.Rpc, hr.Dir, hr.RepoName
 	access := hasAccess(r, dir, rpc, true)
 
 	if access == false {
@@ -149,6 +156,28 @@ func serviceRpc(hr HandlerReq) {
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
+
+	data, err := ioutil.ReadAll(r.Body)
+	bodyReader := ioutil.NopCloser(bytes.NewReader(data))
+
+	//check if the push is for creating/updating new ref
+	nullByteIndex := bytes.Index(data, createSep)
+
+	if nullByteIndex < 0 {
+		//check if push is for deleting ref
+		nullByteIndex = bytes.LastIndex(data, deleteSep)
+	}
+
+	if nullByteIndex > -1 {
+		pushMetadata := data[:nullByteIndex]
+		metaInfo, err := utils.ParseGitPushMetadata(pushMetadata)
+
+		if err != nil {
+			log.Printf("%v\n", err)
+		} else {
+			hub.SuperHubInstance.SendEventToRepo(repoName, metaInfo.Bytes())
+		}
+	}
 
 	env := os.Environ()
 
@@ -192,10 +221,10 @@ func serviceRpc(hr HandlerReq) {
 	var reader io.ReadCloser
 	switch r.Header.Get("Content-Encoding") {
 	case "gzip":
-		reader, err = gzip.NewReader(r.Body)
+		reader, err = gzip.NewReader(bodyReader)
 		defer reader.Close()
 	default:
-		reader = r.Body
+		reader = bodyReader
 	}
 	io.Copy(in, reader)
 	in.Close()
@@ -293,36 +322,14 @@ func sendFile(content_type string, hr HandlerReq) {
 	http.ServeFile(w, r, req_file)
 }
 
-//func getGitDir(file_path string) (string, error) {
-//	root := DefaultConfig.ProjectRoot
-//
-//	if root == "" {
-//		cwd, err := os.Getwd()
-//
-//		if err != nil {
-//			log.Print(err)
-//			return "", err
-//		}
-//
-//		root = cwd
-//	}
-//
-//	f := path.Join(root, file_path)
-//	if _, err := os.Stat(f); os.IsNotExist(err) {
-//		return "", err
-//	}
-//
-//	return f, nil
-//}
-
 func getServiceType(r *http.Request) string {
-	service_type := r.FormValue("service")
+	serviceType := r.FormValue("service")
 
-	if s := strings.HasPrefix(service_type, "git-"); !s {
+	if s := strings.HasPrefix(serviceType, "git-"); !s {
 		return ""
 	}
 
-	return strings.Replace(service_type, "git-", "", 1)
+	return strings.Replace(serviceType, "git-", "", 1)
 }
 
 func hasAccess(r *http.Request, dir string, rpc string, check_content_type bool) bool {
