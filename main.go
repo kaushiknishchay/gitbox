@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"git-on-web/config"
+	"git-on-web/hub"
 	"git-on-web/server"
 	"git-on-web/utils"
 	"log"
@@ -11,12 +12,15 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
+//RepoCreateRequest structure of request
 type RepoCreateRequest struct {
 	RepoName string `json:"name" binding:"required"`
 }
 
+//RepoCreateResponse structure of response
 type RepoCreateResponse struct {
 	Status   bool   `json:"status"`
 	RepoName string `json:"repoName"`
@@ -86,6 +90,44 @@ func addGitRoutes(gitOps *gin.RouterGroup) {
 	})
 }
 
+func addWebSocketRoutes(webSockets *gin.RouterGroup) {
+	webSockets.Any("/*action", func(c *gin.Context) {
+		repoName := c.Params.ByName("repo")
+		_ = c.Param("action")
+
+		if _, ok := hub.SuperHubInstance[repoName]; !ok {
+			hub.SuperHubInstance[repoName] = hub.CreateNewHub(repoName)
+			go hub.SuperHubInstance[repoName].Run()
+		}
+
+		var upgrader websocket.Upgrader = websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		}
+
+		connection, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+
+		if err != nil {
+			log.Printf("%v", err.Error())
+			return
+		}
+
+		client := &hub.Client{
+			Hub:  hub.SuperHubInstance[repoName],
+			Conn: connection,
+			Send: make(chan []byte, 256),
+		}
+
+		client.Hub.Register <- client
+
+		// start a go routine which will send messages to this client when something comes on channel
+		go client.Write()
+	})
+}
+
 func setupServer() *gin.Engine {
 
 	router := gin.Default()
@@ -134,6 +176,9 @@ func setupServer() *gin.Engine {
 
 	gitOps := router.Group("/git/:repo")
 	addGitRoutes(gitOps)
+
+	webSockets := router.Group("/ws/:repo")
+	addWebSocketRoutes(webSockets)
 
 	return router
 }

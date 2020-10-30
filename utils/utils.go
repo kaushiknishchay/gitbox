@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"git-on-web/config"
+	"git-on-web/models"
 	"os"
 	"os/exec"
 	"path"
@@ -39,6 +41,8 @@ type CommitItem struct {
 type CommitLogs []CommitItem
 
 var repoCheckRegEx = regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
+
+const nullSha string = "0000000000000000000000000000000000000000"
 
 //IsRepoNameValid Checks if repo name is valid and contains only alphanumeric chars
 func IsRepoNameValid(repoName string) bool {
@@ -126,4 +130,35 @@ func GetCommitsLog(repoName string, pageNum int64) ([]CommitItem, error) {
 	}
 
 	return gitCommitList, nil
+}
+
+//ParseGitPushMetadata parse the metadat bytearray into a more informative struct
+func ParseGitPushMetadata(metadata []byte) (*models.MetadataInfo, error) {
+	//the starting 4 chars are not part of sha
+	metadataPieces := bytes.Split(metadata[4:], []byte(" "))
+	if len(metadataPieces) < 3 {
+		return nil, errors.New("cannot parse git push info")
+	}
+
+	oldSha := string(metadataPieces[0])
+	newSha := string(metadataPieces[1])
+	//we have a null character after the ref, remove that
+	ref := string(metadataPieces[2][:len(metadataPieces[2])-1])
+
+	typeOfPush := models.MetaInfoType_Unknown
+
+	if oldSha == nullSha {
+		typeOfPush = models.MetaInfoType_Create
+	} else if newSha == nullSha {
+		typeOfPush = models.MetaInfoType_Delete
+	} else {
+		typeOfPush = models.MetaInfoType_Update
+	}
+
+	return &models.MetadataInfo{
+		Ref:    ref,
+		OldSha: oldSha,
+		NewSha: newSha,
+		Type:   typeOfPush,
+	}, nil
 }
