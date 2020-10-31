@@ -44,7 +44,7 @@ func Test_RepoCreateEndpoint(t *testing.T) {
 	}
 
 	if !bodyJson.Status {
-		t.Fatalf("Expected reponse status to be true")
+		t.Fatalf("Expected response status to be true")
 	}
 
 	if bodyJson.RepoName != generateRepoName {
