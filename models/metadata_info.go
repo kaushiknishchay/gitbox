@@ -6,13 +6,12 @@ import (
 )
 
 const (
-	MetaInfoType_Create  string = "CREATE"
-	MetaInfoType_Update  string = "UPDATE"
-	MetaInfoType_Delete  string = "DELETE"
-	MetaInfoType_Unknown string = "UNKNOWN"
+	MetaInfoType_Create string = "CREATE"
+	MetaInfoType_Update string = "UPDATE"
+	MetaInfoType_Delete string = "DELETE"
 )
 
-//MetadataInfo repo update format
+// MetadataInfo repo update format
 type MetadataInfo struct {
 	Type   string `json:"type"`
 	OldSha string `json:"oldSha"`
@@ -20,9 +19,10 @@ type MetadataInfo struct {
 	Ref    string `json:"ref"`
 }
 
-//Bytes return the struct as bytes array
+// Bytes return the struct as bytes array
 func (metadata *MetadataInfo) Bytes() []byte {
 	byteBuffer := new(bytes.Buffer)
-	json.NewEncoder(byteBuffer).Encode(metadata)
+	_ = json.NewEncoder(byteBuffer).Encode(metadata)
+
 	return byteBuffer.Bytes()
 }

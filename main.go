@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"git-on-web/config"
-	"git-on-web/hub"
-	"git-on-web/server"
-	"git-on-web/utils"
+	"golang-app/config"
+	"golang-app/hub"
+	"golang-app/server"
+	"golang-app/utils"
 	"log"
 	"net/http"
 	"strconv"
@@ -15,17 +15,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//RepoCreateRequest structure of request
+// RepoCreateRequest structure of request
 type RepoCreateRequest struct {
 	RepoName string `json:"name" binding:"required"`
 }
 
-//RepoCreateResponse structure of response
+// RepoCreateResponse structure of response
 type RepoCreateResponse struct {
 	Status   bool   `json:"status"`
 	RepoName string `json:"repoName"`
 }
 
+// addGitRoutes Setup all git operation related routes
+//nolint:funlen
 func addGitRoutes(gitOps *gin.RouterGroup) {
 	gitOps.Use(func(c *gin.Context) {
 		repoName := c.Params.ByName("repo")
@@ -128,8 +130,7 @@ func addWebSocketRoutes(webSockets *gin.RouterGroup) {
 	})
 }
 
-func setupServer() *gin.Engine {
-
+func SetupServer() *gin.Engine {
 	router := gin.Default()
 
 	router.GET("/", func(c *gin.Context) {
@@ -188,7 +189,7 @@ func main() {
 	flag.StringVar(&config.REPO_BASE_DIR, "repos", "/tmp/repos", "directory where repos will be created. Default: /tmp/repos")
 	flag.Parse()
 
-	ginRouter := setupServer()
+	ginRouter := SetupServer()
 
 	if err := ginRouter.Run(fmt.Sprintf(":%s", config.PORT)); err != nil {
 		log.Fatalf("Unable to start server %v", err)

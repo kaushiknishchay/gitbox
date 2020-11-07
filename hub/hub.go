@@ -6,10 +6,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//SuperHub keeps track of all repoId and there Hubs
+// SuperHub keeps track of all repoId and there Hubs
 type SuperHub map[string]*SingleHub
 
-//SendEventToRepo to send data to the repo channel
+// SendEventToRepo to send data to the repo channel
 func (sh SuperHub) SendEventToRepo(repoName string, data []byte) {
 	channel, ok := sh[repoName]
 
@@ -18,9 +18,9 @@ func (sh SuperHub) SendEventToRepo(repoName string, data []byte) {
 	}
 }
 
-//SingleHub a single hub entity which
+// SingleHub a single hub entity which
 type SingleHub struct {
-	//repoName for which hub is created
+	// repoName for which hub is created
 	RepoName string
 
 	// Registered clients.
@@ -36,7 +36,7 @@ type SingleHub struct {
 	Unregister chan *Client
 }
 
-//Run Start the hub to listen to events on it
+// Run Start the hub to listen to events on it
 func (h *SingleHub) Run() {
 	for {
 		select {
@@ -60,7 +60,7 @@ func (h *SingleHub) Run() {
 	}
 }
 
-//Client is a middleman between the websocket connection and the hub.
+// Client is a middleman between the websocket connection and the hub.
 type Client struct {
 	Hub *SingleHub
 
@@ -76,18 +76,20 @@ func (client *Client) Write() {
 
 	defer func() {
 		client.Hub.Unregister <- client
+
 		ticker.Stop()
-		client.Conn.Close()
+
+		_ = client.Conn.Close()
 	}()
 
 	for {
 		select {
 		case message, ok := <-client.Send:
-			client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 
 			if !ok {
 				// The hub closed the channel.
-				client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
@@ -97,21 +99,21 @@ func (client *Client) Write() {
 				return
 			}
 
-			w.Write(message)
+			_, _ = w.Write(message)
 
 			// Add queued chat messages to the current websocket message.
 			n := len(client.Send)
 
 			for i := 0; i < n; i++ {
-				w.Write(newline)
-				w.Write(<-client.Send)
+				_, _ = w.Write(newline)
+				_, _ = w.Write(<-client.Send)
 			}
 
 			if err := w.Close(); err != nil {
 				return
 			}
 		case <-ticker.C:
-			client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			_ = client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 
 			if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
@@ -136,10 +138,9 @@ const (
 
 var (
 	newline = []byte{'\n'}
-	space   = []byte{' '}
 )
 
-//CreateNewHub to create new hub for repo
+// CreateNewHub to create new hub for repo
 func CreateNewHub(repoName string) *SingleHub {
 	return &SingleHub{
 		RepoName:   repoName,
@@ -150,5 +151,5 @@ func CreateNewHub(repoName string) *SingleHub {
 	}
 }
 
-//SuperHubInstance the global hub instance to be used everywhere
+// SuperHubInstance the global hub instance to be used everywhere
 var SuperHubInstance SuperHub = make(SuperHub)

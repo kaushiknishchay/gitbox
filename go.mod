@@ -1,4 +1,4 @@
-module git-on-web
+module golang-app
 
 go 1.14
 

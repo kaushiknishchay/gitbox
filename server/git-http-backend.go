@@ -34,10 +34,11 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
-	"git-on-web/config"
-	"git-on-web/hub"
-	"git-on-web/utils"
+	"golang-app/config"
+	"golang-app/hub"
+	"golang-app/utils"
 	"io"
 	"io/ioutil"
 	"log"
@@ -56,7 +57,7 @@ import (
 type Service struct {
 	Method  string
 	Handler func(HandlerReq)
-	Rpc     string
+	RPC     string
 }
 
 type Config struct {
@@ -73,7 +74,7 @@ type Config struct {
 type HandlerReq struct {
 	w        http.ResponseWriter
 	r        *http.Request
-	Rpc      string
+	RPC      string
 	Dir      string
 	File     string
 	RepoName string
@@ -109,9 +110,10 @@ var services = map[string]Service{
 var createSep = []byte{48, 48, 48, 48, 80, 65, 67, 75, 0, 0, 0, 2, 0, 0, 0}
 var deleteSep = []byte{48, 48, 48, 48}
 
-//GitOpsHandler handles git operations
+// GitOpsHandler handles git operations
 func GitOpsHandler(c *gin.Context) {
 	var w = c.Writer
+
 	var r = c.Request
 
 	repoName := c.Params.ByName("repo")
@@ -123,30 +125,32 @@ func GitOpsHandler(c *gin.Context) {
 		}
 
 		if m := re.FindStringSubmatch(r.URL.Path); m != nil {
-
 			if service.Method != r.Method {
 				renderMethodNotAllowed(w, r)
+
 				return
 			}
 
-			rpc := service.Rpc
+			rpc := service.RPC
 			file := strings.Replace(r.URL.Path, m[1]+"/", "", 1)
 			repoAbsolutePath := utils.GetRepoAbsolutePath(repoName)
 
 			hr := HandlerReq{w, r, rpc, repoAbsolutePath, file, repoName}
 			service.Handler(hr)
+
 			return
 		}
 	}
+
 	renderNotFound(w)
-	return
 }
 
+//nolint:funlen
 func serviceRpc(hr HandlerReq) {
-	w, r, rpc, dir, repoName := hr.w, hr.r, hr.Rpc, hr.Dir, hr.RepoName
+	w, r, rpc, dir, repoName := hr.w, hr.r, hr.RPC, hr.Dir, hr.RepoName
 	access := hasAccess(r, dir, rpc, true)
 
-	if access == false {
+	if !access {
 		renderNoAccess(w)
 		return
 	}
@@ -158,13 +162,14 @@ func serviceRpc(hr HandlerReq) {
 	w.WriteHeader(http.StatusOK)
 
 	data, err := ioutil.ReadAll(r.Body)
+
 	bodyReader := ioutil.NopCloser(bytes.NewReader(data))
 
-	//check if the push is for creating/updating new ref
+	// check if the push is for creating/updating new ref
 	nullByteIndex := bytes.Index(data, createSep)
 
 	if nullByteIndex < 0 {
-		//check if push is for deleting ref
+		// check if push is for deleting ref
 		nullByteIndex = bytes.LastIndex(data, deleteSep)
 	}
 
@@ -190,20 +195,24 @@ func serviceRpc(hr HandlerReq) {
 		if DefaultConfig.AuthUserEnvVar != "" {
 			env = append(env, fmt.Sprintf("%s=%s", DefaultConfig.AuthUserEnvVar, user))
 		}
+
 		if DefaultConfig.AuthPassEnvVar != "" {
 			env = append(env, fmt.Sprintf("%s=%s", DefaultConfig.AuthPassEnvVar, password))
 		}
 	}
 
 	args := []string{rpc, "--stateless-rpc", dir}
-	cmd := exec.Command(DefaultConfig.GitBinPath, args...)
+	cmd := exec.Command(DefaultConfig.GitBinPath, args...) //nolint:gosec
 	version := r.Header.Get("Git-Protocol")
+
 	if len(version) != 0 {
 		cmd.Env = append(env, fmt.Sprintf("GIT_PROTOCOL=%s", version))
 	}
+
 	cmd.Dir = dir
 	cmd.Env = env
 	in, err := cmd.StdinPipe()
+
 	if err != nil {
 		log.Print(err)
 	}
@@ -219,15 +228,17 @@ func serviceRpc(hr HandlerReq) {
 	}
 
 	var reader io.ReadCloser
+
 	switch r.Header.Get("Content-Encoding") {
 	case "gzip":
-		reader, err = gzip.NewReader(bodyReader)
+		reader, _ = gzip.NewReader(bodyReader)
 		defer reader.Close()
 	default:
 		reader = bodyReader
 	}
-	io.Copy(in, reader)
-	in.Close()
+
+	_, _ = io.Copy(in, reader)
+	_ = in.Close()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -235,43 +246,51 @@ func serviceRpc(hr HandlerReq) {
 	}
 
 	p := make([]byte, 1024)
+
 	for {
-		n_read, err := stdout.Read(p)
-		if err == io.EOF {
+		nRead, err := stdout.Read(p)
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		n_write, err := w.Write(p[:n_read])
+
+		nWrite, err := w.Write(p[:nRead])
+
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		if n_read != n_write {
-			fmt.Printf("failed to write data: %d read, %d written\n", n_read, n_write)
+
+		if nRead != nWrite {
+			fmt.Printf("failed to write data: %d read, %d written\n", nRead, nWrite)
 			os.Exit(1)
 		}
+
 		flusher.Flush()
 	}
 
-	cmd.Wait()
+	_ = cmd.Wait()
 }
 
 func getInfoRefs(hr HandlerReq) {
 	w, r, dir := hr.w, hr.r, hr.Dir
-	service_name := getServiceType(r)
-	access := hasAccess(r, dir, service_name, false)
+	serviceName := getServiceType(r)
+	access := hasAccess(r, dir, serviceName, false)
 	version := r.Header.Get("Git-Protocol")
+
 	if access {
-		args := []string{service_name, "--stateless-rpc", "--advertise-refs", "."}
+		args := []string{serviceName, "--stateless-rpc", "--advertise-refs", "."}
 		refs := gitCommand(dir, version, args...)
 
 		hdrNocache(w)
-		w.Header().Set("Content-Type", fmt.Sprintf("application/x-git-%s-advertisement", service_name))
+		w.Header().Set("Content-Type", fmt.Sprintf("application/x-git-%s-advertisement", serviceName))
 		w.WriteHeader(http.StatusOK)
+
 		if len(version) == 0 {
-			w.Write(packetWrite("# service=git-" + service_name + "\n"))
-			w.Write(packetFlush())
+			_, _ = w.Write(packetWrite("# service=git-" + serviceName + "\n"))
+			_, _ = w.Write(packetFlush())
 		}
-		w.Write(refs)
+
+		_, _ = w.Write(refs)
 	} else {
 		updateServerInfo(dir)
 		hdrNocache(w)
@@ -306,20 +325,20 @@ func getTextFile(hr HandlerReq) {
 
 // Logic helping functions
 
-func sendFile(content_type string, hr HandlerReq) {
+func sendFile(contentType string, hr HandlerReq) {
 	w, r := hr.w, hr.r
-	req_file := path.Join(hr.Dir, hr.File)
+	reqFile := path.Join(hr.Dir, hr.File)
 
-	f, err := os.Stat(req_file)
+	f, err := os.Stat(reqFile)
 	if os.IsNotExist(err) {
 		renderNotFound(w)
 		return
 	}
 
-	w.Header().Set("Content-Type", content_type)
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", f.Size()))
 	w.Header().Set("Last-Modified", f.ModTime().Format(http.TimeFormat))
-	http.ServeFile(w, r, req_file)
+	http.ServeFile(w, r, reqFile)
 }
 
 func getServiceType(r *http.Request) string {
@@ -332,8 +351,8 @@ func getServiceType(r *http.Request) string {
 	return strings.Replace(serviceType, "git-", "", 1)
 }
 
-func hasAccess(r *http.Request, dir string, rpc string, check_content_type bool) bool {
-	if check_content_type {
+func hasAccess(r *http.Request, dir string, rpc string, checkContentType bool) bool {
+	if checkContentType {
 		if r.Header.Get("Content-Type") != fmt.Sprintf("application/x-git-%s-request", rpc) {
 			return false
 		}
@@ -342,9 +361,11 @@ func hasAccess(r *http.Request, dir string, rpc string, check_content_type bool)
 	if !(rpc == "upload-pack" || rpc == "receive-pack") {
 		return false
 	}
+
 	if rpc == "receive-pack" {
 		return DefaultConfig.ReceivePack
 	}
+
 	if rpc == "upload-pack" {
 		return DefaultConfig.UploadPack
 	}
@@ -352,20 +373,21 @@ func hasAccess(r *http.Request, dir string, rpc string, check_content_type bool)
 	return getConfigSetting(rpc, dir)
 }
 
-func getConfigSetting(service_name string, dir string) bool {
-	service_name = strings.Replace(service_name, "-", "", -1)
-	setting := getGitConfig("http."+service_name, dir)
+func getConfigSetting(serviceName string, dir string) bool {
+	serviceName = strings.ReplaceAll(serviceName, "-", "")
+	setting := getGitConfig("http."+serviceName, dir)
 
-	if service_name == "uploadpack" {
+	if serviceName == "uploadpack" {
 		return setting != "false"
 	}
 
 	return setting == "true"
 }
 
-func getGitConfig(config_name string, dir string) string {
-	args := []string{"config", config_name}
+func getGitConfig(configName string, dir string) string {
+	args := []string{"config", configName}
 	out := string(gitCommand(dir, "", args...))
+
 	return out[0 : len(out)-1]
 }
 
@@ -375,11 +397,14 @@ func updateServerInfo(dir string) []byte {
 }
 
 func gitCommand(dir string, version string, args ...string) []byte {
-	command := exec.Command(DefaultConfig.GitBinPath, args...)
+	command := exec.Command(DefaultConfig.GitBinPath, args...) //nolint:gosec
+
 	if len(version) > 0 {
 		command.Env = append(os.Environ(), fmt.Sprintf("GIT_PROTOCOL=%s", version))
 	}
+
 	command.Dir = dir
+
 	out, err := command.Output()
 
 	if err != nil {
@@ -394,21 +419,21 @@ func gitCommand(dir string, version string, args ...string) []byte {
 func renderMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
 	if r.Proto == "HTTP/1.1" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("Method Not Allowed"))
+		_, _ = w.Write([]byte("Method Not Allowed"))
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Bad Request"))
+		_, _ = w.Write([]byte("Bad Request"))
 	}
 }
 
 func renderNotFound(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("404 Not Found"))
+	_, _ = w.Write([]byte("404 Not Found"))
 }
 
 func renderNoAccess(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte("Forbidden"))
+	_, _ = w.Write([]byte("Forbidden"))
 }
 
 // Packet-line handling function

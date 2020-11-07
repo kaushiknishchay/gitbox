@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"git-on-web/config"
-	"git-on-web/models"
+	"golang-app/config"
+	"golang-app/models"
 	"os"
 	"os/exec"
 	"path"
@@ -14,21 +14,21 @@ import (
 	"strings"
 )
 
-//Author data present in single commit's Author field
+// Author data present in single commit's Author field
 type Author struct {
 	Date  string `json:"date"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
-//CommiterType data present in single commit's commiter field
+// CommiterType data present in single commit's commiter field
 type CommiterType struct {
 	Date  string `json:"date"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
-//CommitItem data present in single commit
+// CommitItem data present in single commit
 type CommitItem struct {
 	Author   Author       `json:"author"`
 	Body     string       `json:"body"`
@@ -37,24 +37,24 @@ type CommitItem struct {
 	Subject  string       `json:"subject"`
 }
 
-//CommitLogs all commits
+// CommitLogs all commits
 type CommitLogs []CommitItem
 
 var repoCheckRegEx = regexp.MustCompile(`^[a-zA-Z\-_0-9]+$`).MatchString
 
 const nullSha string = "0000000000000000000000000000000000000000"
 
-//IsRepoNameValid Checks if repo name is valid and contains only alphanumeric chars
+// IsRepoNameValid Checks if repo name is valid and contains only alphanumeric chars
 func IsRepoNameValid(repoName string) bool {
 	return repoCheckRegEx(repoName)
 }
 
-//GetRepoAbsolutePath Get absolute repo path in repo base dir
+// GetRepoAbsolutePath Get absolute repo path in repo base dir
 func GetRepoAbsolutePath(repoName string) string {
 	return path.Join(config.REPO_BASE_DIR, repoName)
 }
 
-//CheckRepoExists Check is repo with name already present
+// CheckRepoExists Check is repo with name already present
 func CheckRepoExists(repoName string) error {
 	repoAbsolutePath := path.Join(config.REPO_BASE_DIR, repoName)
 
@@ -65,15 +65,16 @@ func CheckRepoExists(repoName string) error {
 	return errors.New("repo with name already exists")
 }
 
-//RemoveRepoAtPath remove directory at the path given
+// RemoveRepoAtPath remove directory at the path given
 func RemoveRepoAtPath(repoAbsolutePath string) error {
 	if err := os.RemoveAll(repoAbsolutePath); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-//CreateNewRepo initialize a bare git repo with given name
+// CreateNewRepo initialize a bare git repo with given name
 func CreateNewRepo(repoName string) error {
 	repoAbsolutePath := GetRepoAbsolutePath(repoName)
 
@@ -90,6 +91,7 @@ func CreateNewRepo(repoName string) error {
 		if err := RemoveRepoAtPath(repoAbsolutePath); err != nil {
 			return err
 		}
+
 		return err
 	}
 
@@ -98,13 +100,14 @@ func CreateNewRepo(repoName string) error {
 
 // GetCommitsLog to fetch commits log as json array
 func GetCommitsLog(repoName string, pageNum int64) ([]CommitItem, error) {
+	pageArg := fmt.Sprintf("-n %d --skip=%d", config.PerPageCommitCount, pageNum*config.PerPageCommitCount)
+
 	logCommand := exec.Command(
 		"git",
 		"log",
 		"--date=iso-strict",
 		config.GitLogFormat,
-		fmt.Sprintf("-n %d", config.PerPageCommitCount),
-		fmt.Sprintf("--skip=%d", pageNum*config.PerPageCommitCount),
+		pageArg,
 	)
 
 	logCommand.Dir = GetRepoAbsolutePath(repoName)
@@ -113,28 +116,30 @@ func GetCommitsLog(repoName string, pageNum int64) ([]CommitItem, error) {
 	logOut := strings.Split(string(out), "^^$$^^$$")
 
 	var gitCommitList []CommitItem
-	var commitItem CommitItem
-	for _, singleLog := range logOut {
 
+	var commitItem CommitItem
+
+	for _, singleLog := range logOut {
 		if singleLog == "" {
 			continue
 		}
 
-		singleLog = strings.Replace(strings.TrimSpace(singleLog), "\n", `\n`, -1)
+		singleLog = strings.ReplaceAll(strings.TrimSpace(singleLog), "\n", `\n`)
 
 		err := json.Unmarshal([]byte(singleLog), &commitItem)
 		if err != nil {
 			continue
 		}
+
 		gitCommitList = append(gitCommitList, commitItem)
 	}
 
 	return gitCommitList, nil
 }
 
-//ParseGitPushMetadata parse the metadat bytearray into a more informative struct
+// ParseGitPushMetadata parse the metadat bytearray into a more informative struct
 func ParseGitPushMetadata(metadata []byte) (*models.MetadataInfo, error) {
-	//the starting 4 chars are not part of sha
+	// the starting 4 chars are not part of sha
 	metadataPieces := bytes.Split(metadata[4:], []byte(" "))
 	if len(metadataPieces) < 3 {
 		return nil, errors.New("cannot parse git push info")
@@ -142,16 +147,17 @@ func ParseGitPushMetadata(metadata []byte) (*models.MetadataInfo, error) {
 
 	oldSha := string(metadataPieces[0])
 	newSha := string(metadataPieces[1])
-	//we have a null character after the ref, remove that
+	// we have a null character after the ref, remove that
 	ref := string(metadataPieces[2][:len(metadataPieces[2])-1])
 
-	typeOfPush := models.MetaInfoType_Unknown
+	typeOfPush := ""
 
-	if oldSha == nullSha {
+	switch {
+	case oldSha == nullSha:
 		typeOfPush = models.MetaInfoType_Create
-	} else if newSha == nullSha {
+	case newSha == nullSha:
 		typeOfPush = models.MetaInfoType_Delete
-	} else {
+	default:
 		typeOfPush = models.MetaInfoType_Update
 	}
 

@@ -1,10 +1,11 @@
-package main
+package main_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"git-on-web/utils"
+	. "golang-app"
+	"golang-app/utils"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,7 @@ import (
 )
 
 func Test_RepoCreateEndpoint(t *testing.T) {
-	ts := httptest.NewServer(setupServer())
+	ts := httptest.NewServer(SetupServer())
 	defer ts.Close()
 
 	generateRepoName := fmt.Sprintf("repo-%v", time.Now().Unix())
@@ -21,6 +22,10 @@ func Test_RepoCreateEndpoint(t *testing.T) {
 	requestBody, err := json.Marshal(map[string]string{
 		"name": generateRepoName,
 	})
+
+	if err != nil {
+		t.Fatalf("error, %v", err)
+	}
 
 	response, err := http.Post(fmt.Sprintf("%s/repo", ts.URL), "application/json", bytes.NewBuffer(requestBody))
 
@@ -34,20 +39,25 @@ func Test_RepoCreateEndpoint(t *testing.T) {
 		t.Fatalf("Expected status code 200, got %v", response.StatusCode)
 	}
 
-	var bodyJson RepoCreateResponse
+	var bodyJSON RepoCreateResponse
 
 	bodyBuffer, err := ioutil.ReadAll(response.Body)
-	err = json.Unmarshal(bodyBuffer, &bodyJson)
+
+	if err != nil {
+		t.Fatalf("error, %v", err)
+	}
+
+	err = json.Unmarshal(bodyBuffer, &bodyJSON)
 
 	if err != nil {
 		t.Fatalf("Body read error : %v", err)
 	}
 
-	if !bodyJson.Status {
+	if !bodyJSON.Status {
 		t.Fatalf("Expected response status to be true")
 	}
 
-	if bodyJson.RepoName != generateRepoName {
+	if bodyJSON.RepoName != generateRepoName {
 		t.Fatalf("Expected create repo name to match the sent repo name")
 	}
 

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"git-on-web/config"
+	"golang-app/config"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -18,6 +18,7 @@ func generateRandomRepoName(length int) string {
 	for i := range b {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
+
 	return string(b)
 }
 
@@ -42,6 +43,7 @@ func TestGetCommitsLog(t *testing.T) {
 	type args struct {
 		repoName string
 	}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -50,6 +52,7 @@ func TestGetCommitsLog(t *testing.T) {
 	}{
 		{"1", args{"test"}, nil, false},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetCommitsLog(tt.args.repoName, 0)
