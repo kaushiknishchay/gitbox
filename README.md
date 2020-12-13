@@ -1,15 +1,15 @@
 # git on web
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/kaushiknishchay/golang-app)](https://goreportcard.com/report/github.com/kaushiknishchay/golang-app)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kaushiknishchay/gitbox)](https://goreportcard.com/report/github.com/kaushiknishchay/gitbox)
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/kaushiknishchay/golang-app/Go?label=Build)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/kaushiknishchay/gitbox/Go?label=Build)
 
-![GitHub Release Date](https://img.shields.io/github/release-date/kaushiknishchay/golang-app?label=Last%20release%20date) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kaushiknishchay/golang-app)
-
-
+![GitHub Release Date](https://img.shields.io/github/release-date/kaushiknishchay/gitbox?label=Last%20release%20date) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kaushiknishchay/gitbox)
 
 
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/kaushiknishchay/golang-app)
+
+
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/kaushiknishchay/gitbox)
 ---
 
 

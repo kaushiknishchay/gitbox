@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"golang-app/config"
+	"gitbox/config"
 	"math/rand"
 	"reflect"
 	"testing"

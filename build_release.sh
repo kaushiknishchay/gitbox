@@ -2,7 +2,7 @@
 
 mkdir -p ./release
 
-package_name='git-on-web'
+package_name='gitbox'
 
 platforms=("windows/amd64" "darwin/amd64" "linux/amd64")
 

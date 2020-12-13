@@ -1,1 +1,1 @@
-web: bin/git-on-web -port=$PORT
+web: bin/gitbox -port=$PORT

@@ -1,4 +1,4 @@
-module golang-app
+module gitbox
 
 go 1.14
 
